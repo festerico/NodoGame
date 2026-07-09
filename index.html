@@ -2,6 +2,16 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#12161c">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="favicon-16.png">
+<link rel="shortcut icon" href="favicon.ico">
+<link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
 <title>NODO — merge survivor</title>
 <style>
   :root{
@@ -15,15 +25,18 @@
     --text:#e8e6df;
     --text-dim:#8b93a1;
   }
-  *{box-sizing:border-box;}
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
   html,body{
     margin:0;padding:0;min-height:100vh;
+    min-height:100dvh;
     background:var(--bg);
     color:var(--text);
     font-family:'Segoe UI',system-ui,sans-serif;
     -webkit-tap-highlight-color:transparent;
     user-select:none;
     overflow-x:hidden;
+    overscroll-behavior:contain;
+    touch-action:manipulation;
   }
   #app{
     width:100%;max-width:420px;
@@ -74,10 +87,11 @@
     display:flex;align-items:center;justify-content:center;
     font-family:'Consolas','Courier New',monospace;
     font-weight:700;
-    font-size:20px;
+    font-size:clamp(16px, 5.5vw, 26px);
     cursor:pointer;
     position:relative;
     transition:background .15s ease;
+    touch-action:manipulation;
   }
   .cell.empty:hover{background:#28303e;}
   .cell.filled{cursor:default;}
@@ -118,12 +132,26 @@
   }
 
   .overlay{
-    position:absolute;inset:0;
-    background:rgba(18,22,28,.94);
-    border-radius:10px;
+    position:fixed;inset:0;
+    background:rgba(10,13,17,.82);
+    backdrop-filter:blur(2px);
     display:flex;flex-direction:column;align-items:center;justify-content:center;
-    gap:14px;padding:20px;text-align:center;
-    z-index:5;
+    padding:20px;
+    padding-top:calc(20px + env(safe-area-inset-top));
+    padding-bottom:calc(20px + env(safe-area-inset-bottom));
+    z-index:50;
+    overflow-y:auto;
+  }
+  .overlay-card{
+    background:var(--panel);
+    border:1px solid var(--cell-border);
+    border-radius:14px;
+    box-shadow:0 20px 50px rgba(0,0,0,.5);
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    gap:14px;padding:24px 20px;text-align:center;
+    width:100%;max-width:380px;
+    max-height:calc(100dvh - 40px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+    overflow-y:auto;
   }
   .overlay h2{margin:0;font-size:16px;letter-spacing:1px;color:var(--amber);}
   .overlay p{margin:0;font-size:12px;color:var(--text-dim);line-height:1.5;}
@@ -132,12 +160,14 @@
     flex:1;background:var(--cell);border:1px solid var(--cell-border);
     color:var(--text);border-radius:8px;padding:12px 8px;
     font-family:inherit;font-size:12px;cursor:pointer;line-height:1.4;
+    touch-action:manipulation;
   }
   .choice-btn:hover{border-color:var(--teal);}
   .choice-btn b{display:block;color:var(--teal);font-size:13px;margin-bottom:4px;}
   .restart-btn{
     background:var(--teal);color:#0f1520;border:none;border-radius:8px;
-    padding:10px 22px;font-weight:700;cursor:pointer;font-size:13px;
+    padding:12px 22px;font-weight:700;cursor:pointer;font-size:14px;
+    touch-action:manipulation;min-height:44px;
   }
   .title{
     font-size:11px;letter-spacing:4px;color:var(--text-dim);
@@ -150,10 +180,10 @@
   }
   .help-btn{
     position:absolute;right:0;top:50%;transform:translateY(-50%);
-    width:22px;height:22px;border-radius:50%;
+    width:30px;height:30px;border-radius:50%;
     background:var(--cell);border:1px solid var(--cell-border);
-    color:var(--text-dim);font-family:inherit;font-size:12px;font-weight:700;
-    cursor:pointer;line-height:1;
+    color:var(--text-dim);font-family:inherit;font-size:13px;font-weight:700;
+    cursor:pointer;line-height:1;touch-action:manipulation;
   }
   .help-btn:hover{border-color:var(--teal);color:var(--teal);}
 
@@ -173,6 +203,10 @@
 
   .layout{
     padding:18px;
+    padding-top:calc(18px + env(safe-area-inset-top));
+    padding-bottom:calc(18px + env(safe-area-inset-bottom));
+    padding-left:calc(18px + env(safe-area-inset-left));
+    padding-right:calc(18px + env(safe-area-inset-right));
   }
   #app{width:100%;max-width:420px;margin:0 auto;padding:0;}
 
@@ -305,12 +339,24 @@
 
   .sound-btn{
     position:absolute;left:0;top:50%;transform:translateY(-50%);
-    width:22px;height:22px;border-radius:50%;
+    width:30px;height:30px;border-radius:50%;
     background:var(--cell);border:1px solid var(--cell-border);
-    color:var(--text-dim);font-family:inherit;font-size:12px;
-    cursor:pointer;line-height:1;
+    color:var(--text-dim);font-family:inherit;font-size:13px;
+    cursor:pointer;line-height:1;touch-action:manipulation;
   }
   .sound-btn:hover{border-color:var(--teal);color:var(--teal);}
+
+  @media (max-width:360px){
+    .choice-row{flex-direction:column;}
+  }
+
+  @media (min-width:600px) and (max-width:1000px){
+    #app{max-width:480px;}
+    h1{font-size:26px;}
+    .cell{font-size:clamp(20px, 4vw, 30px);}
+    .next-tile{width:50px;height:50px;font-size:20px;}
+    .choice-btn{padding:16px 12px;font-size:13px;}
+  }
 
   @media (max-width:1000px){
     #leaderboard{
@@ -630,15 +676,16 @@ function showChoice(){
   const overlay = document.createElement('div');
   overlay.className = 'overlay';
   overlay.innerHTML = `
-    <h2>Decisión</h2>
-    <p>Podés arriesgar por más potencia o jugar seguro.</p>
-    <div class="choice-row">
-      <button class="choice-btn" id="riskBtn"><b>Arriesgar</b>Próxima pieza +2 tiers, pero la oleada actual sube 40% de umbral</button>
-      <button class="choice-btn" id="safeBtn"><b>Jugar seguro</b>Próxima pieza garantizada tier 2 o 3, sin subir el umbral</button>
+    <div class="overlay-card">
+      <h2>Decisión</h2>
+      <p>Podés arriesgar por más potencia o jugar seguro.</p>
+      <div class="choice-row">
+        <button class="choice-btn" id="riskBtn"><b>Arriesgar</b>Próxima pieza +2 tiers, pero la oleada actual sube 40% de umbral</button>
+        <button class="choice-btn" id="safeBtn"><b>Jugar seguro</b>Próxima pieza garantizada tier 2 o 3, sin subir el umbral</button>
+      </div>
     </div>
   `;
-  gridEl.style.position = 'relative';
-  gridEl.appendChild(overlay);
+  document.body.appendChild(overlay);
   document.getElementById('riskBtn').onclick = ()=>{
     nextTier = Math.min(rollTier()+2, 7);
     threshold = Math.round(threshold*1.4);
@@ -753,15 +800,16 @@ function endGame(reason){
   const overlay = document.createElement('div');
   overlay.className = 'overlay';
   overlay.innerHTML = `
-    <h2>Fin de partida</h2>
-    <p>${reason}</p>
-    <p style="color:var(--amber);font-size:16px;font-weight:700;">Score final: ${score} — Oleada ${waveIndex}</p>
-    ${isNewRecord ? '<p style="color:var(--teal);font-size:13px;font-weight:700;">🏆 ¡Nuevo récord personal!</p>' : ''}
-    <p id="saveStatus" class="save-status" style="font-size:11px;color:var(--text-dim);min-height:14px;">${currentUser ? 'Guardando resultado…' : ''}</p>
-    <button class="restart-btn" id="restartBtn" ${currentUser ? 'disabled' : ''}>Reintentar</button>
+    <div class="overlay-card">
+      <h2>Fin de partida</h2>
+      <p>${reason}</p>
+      <p style="color:var(--amber);font-size:16px;font-weight:700;">Score final: ${score} — Oleada ${waveIndex}</p>
+      ${isNewRecord ? '<p style="color:var(--teal);font-size:13px;font-weight:700;">🏆 ¡Nuevo récord personal!</p>' : ''}
+      <p id="saveStatus" class="save-status" style="font-size:11px;color:var(--text-dim);min-height:14px;">${currentUser ? 'Guardando resultado…' : ''}</p>
+      <button class="restart-btn" id="restartBtn" ${currentUser ? 'disabled' : ''}>Reintentar</button>
+    </div>
   `;
-  gridEl.style.position = 'relative';
-  gridEl.appendChild(overlay);
+  document.body.appendChild(overlay);
   const restartBtn = document.getElementById('restartBtn');
   const saveStatusEl = document.getElementById('saveStatus');
 
@@ -925,16 +973,17 @@ function showNameEntry(prefillError){
   const overlay = document.createElement('div');
   overlay.className = 'overlay';
   overlay.innerHTML = `
-    <h2>Reservá tu nombre</h2>
-    <p>Elegí un nombre y un PIN de 4 dígitos. La primera vez que los uses juntos, quedan reservados: nadie más va a poder jugar con tu nombre sin ese PIN.</p>
-    <input class="name-input" id="nameInput" maxlength="14" placeholder="Tu nombre" autocomplete="off">
-    <input class="pin-input" id="pinInput" maxlength="4" placeholder="••••" inputmode="numeric" pattern="[0-9]*" autocomplete="off">
-    <div class="pin-hint">Solo números, 4 dígitos. Anotalo — lo vas a necesitar cada vez que vuelvas.</div>
-    <div class="form-error" id="formError">${prefillError || ''}</div>
-    <button class="restart-btn" id="nameConfirmBtn">Entrar</button>
+    <div class="overlay-card">
+      <h2>Reservá tu nombre</h2>
+      <p>Elegí un nombre y un PIN de 4 dígitos. La primera vez que los uses juntos, quedan reservados: nadie más va a poder jugar con tu nombre sin ese PIN.</p>
+      <input class="name-input" id="nameInput" maxlength="14" placeholder="Tu nombre" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false">
+      <input class="pin-input" id="pinInput" maxlength="4" placeholder="••••" inputmode="numeric" pattern="[0-9]*" autocomplete="off">
+      <div class="pin-hint">Solo números, 4 dígitos. Anotalo — lo vas a necesitar cada vez que vuelvas.</div>
+      <div class="form-error" id="formError">${prefillError || ''}</div>
+      <button class="restart-btn" id="nameConfirmBtn">Entrar</button>
+    </div>
   `;
-  gridEl.style.position = 'relative';
-  gridEl.appendChild(overlay);
+  document.body.appendChild(overlay);
   const nameInput = document.getElementById('nameInput');
   const pinInput = document.getElementById('pinInput');
   const errorEl = document.getElementById('formError');
@@ -1022,11 +1071,13 @@ function showInstructions(isFirstTime){
   paused = true;
   const overlay = document.createElement('div');
   overlay.className = 'overlay';
-  overlay.innerHTML = HOWTO_HTML + `
-    <button class="restart-btn" id="howtoCloseBtn">${isFirstTime ? 'A jugar' : 'Cerrar'}</button>
+  overlay.innerHTML = `
+    <div class="overlay-card">
+      ${HOWTO_HTML}
+      <button class="restart-btn" id="howtoCloseBtn">${isFirstTime ? 'A jugar' : 'Cerrar'}</button>
+    </div>
   `;
-  gridEl.style.position = 'relative';
-  gridEl.appendChild(overlay);
+  document.body.appendChild(overlay);
   document.getElementById('howtoCloseBtn').onclick = ()=>{
     overlay.remove();
     paused = false; // tickWave ya contempla el tiempo pausado vía pausedAccum
