@@ -779,7 +779,7 @@ function endGame(reason){
   async function trySave(){
     restartBtn.disabled = true;
     restartBtn.textContent = 'Guardando…';
-    const ok = await reportGameResult(score);
+    const { ok, errMsg } = await reportGameResult(score);
     if(ok){
       saved = true;
       saveStatusEl.textContent = isNewRecord ? '🏆 Récord actualizado en el ranking.' : 'Resultado guardado.';
@@ -787,7 +787,7 @@ function endGame(reason){
       restartBtn.disabled = false;
       restartBtn.textContent = 'Reintentar';
     } else {
-      saveStatusEl.textContent = 'No se pudo guardar tu resultado — revisá tu conexión y volvé a intentar.';
+      saveStatusEl.textContent = 'No se guardó: ' + errMsg;
       saveStatusEl.style.color = 'var(--danger)';
       restartBtn.disabled = false;
       restartBtn.textContent = 'Reintentar guardado';
@@ -865,6 +865,8 @@ function escapeHtml(s){
 
 async function reportGameResult(finalScore){
   let ok = true;
+  let errMsg = '';
+  const expectedMin = Math.max(finalScore, myBestScore); // lo que debería quedar guardado como mínimo
   try{
     const { error } = await sb.rpc('submit_score', {
       p_name: currentUser.name,
@@ -872,11 +874,26 @@ async function reportGameResult(finalScore){
       p_score: finalScore
     });
     if(error) throw error;
+
+    // Verificación real: no confiamos en "sin error = guardado".
+    // Releemos la fila del servidor y confirmamos que el best_score quedó como corresponde.
+    const { data: verifyRows, error: verifyError } = await sb
+      .from('leaderboard')
+      .select('best_score')
+      .eq('name', currentUser.name)
+      .limit(1);
+    if(verifyError) throw verifyError;
+    const savedBest = (verifyRows && verifyRows[0]) ? verifyRows[0].best_score : null;
+    if(savedBest === null || savedBest < expectedMin){
+      ok = false; // el RPC no tiró error, pero el valor en el servidor no refleja el score enviado
+      errMsg = 'El servidor no confirmó el guardado del puntaje.';
+    }
   }catch(e){
     ok = false;
+    errMsg = (e && e.message) ? e.message : 'Error de conexión con el servidor.';
   }
   await renderLeaderboard();
-  return ok;
+  return { ok, errMsg };
 }
 
 // Se suscribe a cambios en vivo: si otro jugador reporta un puntaje,
