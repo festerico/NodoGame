@@ -240,6 +240,78 @@
     color:var(--danger);font-size:11px;min-height:14px;
   }
 
+  /* ---------- Juice: feedback sensorial ---------- */
+  @keyframes shakeStrong{
+    0%,100%{transform:translate(0,0);}
+    20%{transform:translate(-6px,3px);}
+    40%{transform:translate(5px,-4px);}
+    60%{transform:translate(-4px,-2px);}
+    80%{transform:translate(3px,3px);}
+  }
+  @keyframes shakeSoft{
+    0%,100%{transform:translate(0,0);}
+    25%{transform:translate(-3px,1px);}
+    50%{transform:translate(3px,-2px);}
+    75%{transform:translate(-2px,1px);}
+  }
+  #app.shake-strong{animation:shakeStrong .32s ease;}
+  #app.shake-soft{animation:shakeSoft .22s ease;}
+
+  .cell.merge-pop{animation:mergePop .38s cubic-bezier(.34,1.56,.64,1);}
+  @keyframes mergePop{
+    0%{transform:scale(1);}
+    45%{transform:scale(1.35);filter:brightness(1.5);}
+    100%{transform:scale(1);}
+  }
+
+  .score-popup{
+    position:absolute;
+    font-family:'Consolas','Courier New',monospace;
+    font-weight:700;font-size:13px;color:var(--teal);
+    pointer-events:none;z-index:6;
+    animation:popupFloat 0.9s ease-out forwards;
+    white-space:nowrap;
+  }
+  .score-popup.combo{color:var(--amber);font-size:15px;}
+  @keyframes popupFloat{
+    0%{opacity:0;transform:translateY(0) scale(.8);}
+    15%{opacity:1;transform:translateY(-6px) scale(1.1);}
+    100%{opacity:0;transform:translateY(-38px) scale(1);}
+  }
+
+  .wavebar-wrap.danger .wavebar{
+    background:linear-gradient(90deg,var(--danger),#ff8a5c);
+    animation:dangerGlow .55s ease-in-out infinite;
+  }
+  @keyframes dangerGlow{
+    0%,100%{filter:brightness(1);}
+    50%{filter:brightness(1.5);}
+  }
+  .powerline.danger #power{
+    color:var(--danger);
+    animation:dangerText .55s ease-in-out infinite;
+  }
+  @keyframes dangerText{
+    0%,100%{transform:scale(1);}
+    50%{transform:scale(1.15);}
+  }
+
+  .streak-badge{
+    font-size:11px;color:var(--amber);font-weight:700;
+    opacity:0;transition:opacity .25s ease;
+    font-family:'Consolas','Courier New',monospace;
+  }
+  .streak-badge.show{opacity:1;}
+
+  .sound-btn{
+    position:absolute;left:0;top:50%;transform:translateY(-50%);
+    width:22px;height:22px;border-radius:50%;
+    background:var(--cell);border:1px solid var(--cell-border);
+    color:var(--text-dim);font-family:inherit;font-size:12px;
+    cursor:pointer;line-height:1;
+  }
+  .sound-btn:hover{border-color:var(--teal);color:var(--teal);}
+
   @media (max-width:1000px){
     #leaderboard{
       position:static;transform:none;
@@ -255,6 +327,7 @@
 <div class="layout">
 <div id="app">
   <div class="title-row">
+    <button id="soundBtn" class="sound-btn" title="Sonido">🔊</button>
     <div class="title">grilla táctica</div>
     <button id="helpBtn" class="help-btn" title="Cómo se juega">?</button>
   </div>
@@ -270,6 +343,7 @@
     <div><div class="label">Oleada</div><div class="value" id="waveNum">1</div></div>
     <div><div class="label">Vidas</div><div class="lives" id="lives">♥ ♥ ♥</div></div>
   </div>
+  <div class="streak-badge" id="streakBadge">🔥 Racha x0</div>
 
   <div class="wavebar-wrap"><div class="wavebar" id="waveTimer"></div></div>
   <div class="powerline">
@@ -323,6 +397,11 @@ let placedCount = 0;
 let gameOver = false;
 let paused = true; // arranca pausado hasta que haya un usuario identificado
 let currentUser = null; // {name}
+let winStreak = 0; // oleadas repelidas seguidas — se rompe si pierdes una
+let soundOn = true;
+let dangerActive = false;
+let lastDangerTick = 0;
+let myBestScore = 0; // se sincroniza con el servidor cada vez que se lee el ranking
 
 const ME_KEY = 'nodo_me'; // clave de localStorage (no window.storage: fuera de claude.ai no existe)
 
@@ -341,6 +420,75 @@ const switchUserBtn = document.getElementById('switchUserBtn');
 const helpBtn = document.getElementById('helpBtn');
 const lbListEl = document.getElementById('lbList');
 const lbStatusEl = document.getElementById('lbStatus');
+const streakBadgeEl = document.getElementById('streakBadge');
+const soundBtn = document.getElementById('soundBtn');
+const appEl = document.getElementById('app');
+const wavebarWrapEl = document.querySelector('.wavebar-wrap');
+const powerlineEl = document.querySelector('.powerline');
+
+// ---------- Audio sintetizado (sin archivos externos) ----------
+let audioCtx = null;
+function ensureAudio(){
+  if(!audioCtx){
+    try{ audioCtx = new (window.AudioContext || window.webkitAudioContext)(); }
+    catch(e){ soundOn = false; }
+  }
+  if(audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+}
+function beep(freq, dur, type, vol){
+  if(!soundOn) return;
+  ensureAudio();
+  if(!audioCtx) return;
+  const t0 = audioCtx.currentTime;
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.type = type || 'sine';
+  osc.frequency.setValueAtTime(freq, t0);
+  gain.gain.setValueAtTime(0, t0);
+  gain.gain.linearRampToValueAtTime(vol!=null?vol:0.12, t0+0.01);
+  gain.gain.exponentialRampToValueAtTime(0.0001, t0+dur);
+  osc.connect(gain).connect(audioCtx.destination);
+  osc.start(t0);
+  osc.stop(t0+dur+0.02);
+}
+function sfxPlace(){ beep(320, 0.08, 'triangle', 0.08); }
+function sfxMerge(tier){ beep(260 + tier*45, 0.14, 'square', 0.10); }
+function sfxChain(step){ beep(500 + step*90, 0.12, 'sine', 0.12); }
+function sfxWaveWin(){ beep(440,0.1,'triangle',0.12); setTimeout(()=>beep(660,0.16,'triangle',0.13),90); }
+function sfxWaveLose(){ beep(160,0.28,'sawtooth',0.14); setTimeout(()=>beep(100,0.3,'sawtooth',0.12),100); }
+function sfxDangerTick(){ beep(880,0.05,'square',0.05); }
+function sfxGameOver(){ beep(200,0.35,'sawtooth',0.15); setTimeout(()=>beep(140,0.5,'sawtooth',0.14),150); }
+
+function vibrate(pattern){
+  try{ if(navigator.vibrate) navigator.vibrate(pattern); }catch(e){}
+}
+
+soundBtn.addEventListener('click', ()=>{
+  soundOn = !soundOn;
+  soundBtn.textContent = soundOn ? '🔊' : '🔇';
+  if(soundOn) ensureAudio();
+});
+
+// ---------- Screen shake ----------
+function shake(strong){
+  appEl.classList.remove('shake-strong','shake-soft');
+  void appEl.offsetWidth;
+  appEl.classList.add(strong ? 'shake-strong' : 'shake-soft');
+}
+
+// ---------- Popups de puntaje flotante ----------
+function scorePopup(cellIdx, text, isCombo){
+  const cellEl = gridEl.children[cellIdx];
+  if(!cellEl) return;
+  const pop = document.createElement('div');
+  pop.className = 'score-popup' + (isCombo ? ' combo' : '');
+  pop.textContent = text;
+  pop.style.left = cellEl.offsetLeft + cellEl.offsetWidth/2 + 'px';
+  pop.style.top = cellEl.offsetTop + 'px';
+  pop.style.transform = 'translateX(-50%)';
+  gridEl.appendChild(pop);
+  setTimeout(()=>pop.remove(), 950);
+}
 
 function rollTier(){
   // corta-rachas: si ya salieron 3 tier-1 seguidos, la próxima es al menos tier 2
@@ -402,6 +550,7 @@ function neighbors(i){
 function resolveMerges(startIdx){
   let queue = [startIdx];
   let mergedAny = false;
+  let chainStep = 0;
   while(queue.length){
     const idx = queue.shift();
     const t = board[idx];
@@ -411,10 +560,23 @@ function resolveMerges(startIdx){
         board[n] = 0;
         board[idx] = t+1;
         mergedAny = true;
-        score += (t+1)*5;
+        chainStep++;
+        const gained = (t+1)*5 * chainStep; // cada eslabón de la cadena vale más
+        score += gained;
+        scorePopup(idx, '+' + gained, chainStep>1);
+        if(chainStep>1) sfxChain(chainStep); else sfxMerge(t+1);
         queue.push(idx);
         break;
       }
+    }
+  }
+  if(mergedAny){
+    const cellEl = gridEl.children[startIdx];
+    if(cellEl){ cellEl.classList.remove('merge-pop'); void cellEl.offsetWidth; cellEl.classList.add('merge-pop'); }
+    if(chainStep >= 2){
+      shake(chainStep >= 3);
+      vibrate(chainStep >= 3 ? [15,30,15] : 12);
+      scorePopup(startIdx, '¡Cadena x'+chainStep+'!', true);
     }
   }
   return mergedAny;
@@ -438,6 +600,8 @@ function onCellClick(i){
   if(gameOver || paused) return;
   if(board[i] !== 0) return;
   board[i] = nextTier;
+  sfxPlace();
+  vibrate(6);
   resolveMerges(i);
   placedCount++;
   render();
@@ -507,27 +671,60 @@ function tickWave(now){
   const pct = Math.min(elapsed / waveDuration, 1);
   waveTimerEl.style.transform = 'scaleX(' + pct + ')';
 
+  const power = board.reduce((a,b)=>a+b,0);
+  const shouldPanic = pct >= 0.72 && power < threshold;
+  if(shouldPanic !== dangerActive){
+    dangerActive = shouldPanic;
+    wavebarWrapEl.classList.toggle('danger', dangerActive);
+    powerlineEl.classList.toggle('danger', dangerActive);
+  }
+  if(dangerActive){
+    const tickGap = Math.max(120, 550 - (pct-0.72)*2200); // se acelera al acercarse al límite
+    if(now - lastDangerTick > tickGap){
+      lastDangerTick = now;
+      sfxDangerTick();
+      vibrate(8);
+    }
+  }
+
   if(pct >= 1){
     resolveWave();
   }
 }
 
 function resolveWave(){
+  dangerActive = false;
+  wavebarWrapEl.classList.remove('danger');
+  powerlineEl.classList.remove('danger');
   const power = board.reduce((a,b)=>a+b,0);
   if(power >= threshold){
-    score += threshold * 3;
-    msgEl.textContent = 'Oleada repelida ✓';
+    winStreak++;
+    const streakBonus = winStreak >= 2 ? Math.round(threshold * 0.15 * Math.min(winStreak-1,8)) : 0;
+    score += threshold * 3 + streakBonus;
+    msgEl.textContent = streakBonus>0 ? `Oleada repelida ✓ (+racha)` : 'Oleada repelida ✓';
     msgEl.style.color = 'var(--teal)';
     waveIndex++;
+    sfxWaveWin();
+    vibrate([10,20,10]);
+    if(winStreak >= 2){
+      streakBadgeEl.textContent = '🔥 Racha x' + winStreak;
+      streakBadgeEl.classList.add('show');
+    }
     // Crecimiento suave al principio, se acelera después de la oleada 6
     const rampFactor = waveIndex <= 6 ? 1.12 : 1.12 + (waveIndex-6)*0.015;
     threshold = Math.round(threshold * rampFactor) + Math.ceil(waveIndex*0.4);
   } else {
     lives--;
+    winStreak = 0;
+    streakBadgeEl.classList.remove('show');
     msgEl.textContent = 'Oleada te superó — perdiste una unidad clave';
     msgEl.style.color = 'var(--danger)';
+    sfxWaveLose();
+    vibrate([40,30,40]);
+    shake(true);
     removeStrongestTile();
     if(lives <= 0){
+      sfxGameOver();
       endGame('Tres oleadas te superaron. La grilla cayó.');
       return;
     }
@@ -552,20 +749,51 @@ function removeStrongestTile(){
 
 function endGame(reason){
   gameOver = true;
+  const isNewRecord = currentUser && score > myBestScore;
   const overlay = document.createElement('div');
   overlay.className = 'overlay';
   overlay.innerHTML = `
     <h2>Fin de partida</h2>
     <p>${reason}</p>
     <p style="color:var(--amber);font-size:16px;font-weight:700;">Score final: ${score} — Oleada ${waveIndex}</p>
-    <button class="restart-btn" id="restartBtn">Reintentar</button>
+    ${isNewRecord ? '<p style="color:var(--teal);font-size:13px;font-weight:700;">🏆 ¡Nuevo récord personal!</p>' : ''}
+    <p id="saveStatus" class="save-status" style="font-size:11px;color:var(--text-dim);min-height:14px;">${currentUser ? 'Guardando resultado…' : ''}</p>
+    <button class="restart-btn" id="restartBtn" ${currentUser ? 'disabled' : ''}>Reintentar</button>
   `;
   gridEl.style.position = 'relative';
   gridEl.appendChild(overlay);
-  document.getElementById('restartBtn').onclick = ()=>location.reload();
-  if(currentUser){
-    reportGameResult(score);
+  const restartBtn = document.getElementById('restartBtn');
+  const saveStatusEl = document.getElementById('saveStatus');
+
+  if(!currentUser){
+    restartBtn.onclick = ()=>location.reload();
+    return;
   }
+
+  let saved = false;
+  restartBtn.onclick = ()=>{
+    if(saved){ location.reload(); return; }
+    trySave();
+  };
+
+  async function trySave(){
+    restartBtn.disabled = true;
+    restartBtn.textContent = 'Guardando…';
+    const ok = await reportGameResult(score);
+    if(ok){
+      saved = true;
+      saveStatusEl.textContent = isNewRecord ? '🏆 Récord actualizado en el ranking.' : 'Resultado guardado.';
+      saveStatusEl.style.color = 'var(--teal)';
+      restartBtn.disabled = false;
+      restartBtn.textContent = 'Reintentar';
+    } else {
+      saveStatusEl.textContent = 'No se pudo guardar tu resultado — revisá tu conexión y volvé a intentar.';
+      saveStatusEl.style.color = 'var(--danger)';
+      restartBtn.disabled = false;
+      restartBtn.textContent = 'Reintentar guardado';
+    }
+  }
+  trySave();
 }
 
 function loop(now){
@@ -605,6 +833,10 @@ async function renderLeaderboard(){
     return;
   }
   const entries = rows.map(r => ({ name: r.name, bestScore: r.best_score, attempts: r.attempts }));
+  if(currentUser){
+    const mine = entries.find(e => e.name === currentUser.name);
+    myBestScore = mine ? mine.bestScore : 0;
+  }
   entries.sort((a,b)=> ratingOf(b) - ratingOf(a));
   const top = entries.slice(0, 15);
   const medals = ['👑','🥈','🥉'];
@@ -632,6 +864,7 @@ function escapeHtml(s){
 }
 
 async function reportGameResult(finalScore){
+  let ok = true;
   try{
     const { error } = await sb.rpc('submit_score', {
       p_name: currentUser.name,
@@ -640,9 +873,10 @@ async function reportGameResult(finalScore){
     });
     if(error) throw error;
   }catch(e){
-    // si falla el guardado, el juego sigue funcionando igual
+    ok = false;
   }
-  renderLeaderboard();
+  await renderLeaderboard();
+  return ok;
 }
 
 // Se suscribe a cambios en vivo: si otro jugador reporta un puntaje,
