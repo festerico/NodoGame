@@ -974,11 +974,11 @@ function showNameEntry(prefillError){
   overlay.className = 'overlay';
   overlay.innerHTML = `
     <div class="overlay-card">
-      <h2>Reservá tu nombre</h2>
-      <p>Elegí un nombre y un PIN de 4 dígitos. La primera vez que los uses juntos, quedan reservados: nadie más va a poder jugar con tu nombre sin ese PIN.</p>
+      <h2>Ingresá tu nombre y PIN</h2>
+      <p><b style="color:var(--teal);">¿Ya jugaste antes?</b> Escribí el mismo nombre y PIN que usaste la última vez para seguir con tu cuenta.<br><br><b style="color:var(--amber);">¿Primera vez?</b> Elegí un nombre y un PIN de 4 dígitos — quedan reservados automáticamente para vos.</p>
       <input class="name-input" id="nameInput" maxlength="14" placeholder="Tu nombre" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false">
       <input class="pin-input" id="pinInput" maxlength="4" placeholder="••••" inputmode="numeric" pattern="[0-9]*" autocomplete="off">
-      <div class="pin-hint">Solo números, 4 dígitos. Anotalo — lo vas a necesitar cada vez que vuelvas.</div>
+      <div class="pin-hint">Solo números, 4 dígitos.</div>
       <div class="form-error" id="formError">${prefillError || ''}</div>
       <button class="restart-btn" id="nameConfirmBtn">Entrar</button>
     </div>
